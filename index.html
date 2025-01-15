@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de Markdown</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+        }
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            background-color: #007acc;
+            padding: 10px;
+            color: white;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            gap: 8px;
+        }
+        .toolbar button {
+            background-color: #005f99;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s, transform 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .toolbar button:hover {
+            background-color: #004080;
+            transform: scale(1.05);
+        }
+        .toolbar button span {
+            margin-left: 5px;
+        }
+        .editor-container {
+            display: flex;
+            flex: 1;
+            margin-top: 10px;
+            gap: 15px;
+            padding: 10px;
+            flex-wrap: wrap;
+        }
+        textarea, #preview {
+            flex: 1;
+            min-width: 300px;
+            border: 1px solid #ccc;
+            padding: 15px;
+            font-size: 16px;
+            resize: none;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        textarea {
+            transition: border-color 0.3s;
+        }
+        textarea:focus {
+            border-color: #007acc;
+            outline: none;
+        }
+        #preview {
+            background-color: #ffffff;
+            overflow-y: auto;
+        }
+        #preview::before {
+            content: "Pré-visualização será exibida aqui...";
+            color: #aaa;
+            font-style: italic;
+        }
+        #preview h1, #preview h2 {
+            color: #007acc;
+        }
+        .dark-theme {
+            background-color: #333;
+            color: #fff;
+        }
+        .dark-theme textarea, .dark-theme #preview {
+            background-color: #444;
+            color: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button title="Negrito" aria-label="Negrito" onclick="formatText('bold')"><strong>B</strong></button>
+        <button title="Itálico" aria-label="Itálico" onclick="formatText('italic')"><em>I</em></button>
+        <button title="Título" aria-label="Título" onclick="formatText('heading')">H1</button>
+        <button title="Subtítulo" aria-label="Subtítulo" onclick="formatText('subheading')">H2</button>
+        <button title="Código" aria-label="Código" onclick="formatText('code')">{ }</button>
+        <button title="Lista" aria-label="Lista" onclick="formatText('list')">&#8226; &#8226; &#8226;</button>
+        <button title="Citação" aria-label="Citação" onclick="formatText('quote')">&#8220;</button>
+        <button title="Link" aria-label="Link" onclick="showLinkDialog()">&#128279;</button>
+        <button title="Imagem" aria-label="Imagem" onclick="showImageDialog()">&#128247;</button>
+        <button onclick="toggleTheme()">&#127770;</button>
+        <button onclick="saveMarkdown()">&#128190;</button>
+        <input type="file" id="loadFile" style="display:none" onchange="loadMarkdown(event)">
+        <button onclick="document.getElementById('loadFile').click()">&#128194;</button>
+    </div>
+    <div class="editor-container">
+        <textarea id="editor" placeholder="Escreva seu Markdown aqui..."></textarea>
+        <div id="preview"></div>
+    </div>
+
+    <div id="linkDialog" style="display:none; position:fixed; top:20%; left:50%; transform:translate(-50%, -20%); padding:20px; background:white; box-shadow:0 4px 10px rgba(0, 0, 0, 0.2); border-radius:8px;">
+        <label for="linkUrl">Digite a URL:</label>
+        <input type="url" id="linkUrl" placeholder="https://example.com" style="width:100%; margin-top:5px; padding:8px;">
+        <button onclick="insertLinkFromDialog()">Inserir</button>
+        <button onclick="closeDialog('linkDialog')">Cancelar</button>
+    </div>
+
+    <div id="imageDialog" style="display:none; position:fixed; top:30%; left:50%; transform:translate(-50%, -30%); padding:20px; background:white; box-shadow:0 4px 10px rgba(0, 0, 0, 0.2); border-radius:8px;">
+        <label for="imageUrl">Digite a URL da imagem:</label>
+        <input type="url" id="imageUrl" placeholder="https://example.com/image.jpg" style="width:100%; margin-top:5px; padding:8px;">
+        <button onclick="insertImageFromDialog()">Inserir</button>
+        <button onclick="closeDialog('imageDialog')">Cancelar</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/1.9.1/showdown.min.js"></script>
+    <script>
+        const editor = document.getElementById('editor');
+        const preview = document.getElementById('preview');
+        const converter = new showdown.Converter();
+
+        editor.addEventListener('input', updatePreview);
+
+        window.addEventListener('beforeunload', () => {
+            localStorage.setItem('markdownContent', editor.value);
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedContent = localStorage.getItem('markdownContent');
+            if (savedContent) {
+                editor.value = savedContent;
+                updatePreview();
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.ctrlKey && event.key === 'b') {
+                formatText('bold');
+                event.preventDefault();
+            } else if (event.ctrlKey && event.key === 'i') {
+                formatText('italic');
+                event.preventDefault();
+            }
+        });
+
+        function updatePreview() {
+            const html = converter.makeHtml(editor.value);
+            preview.innerHTML = html;
+        }
+
+        function formatText(format) {
+            const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
+            let formattedText = '';
+
+            switch (format) {
+                case 'bold':
+                    formattedText = `**${selectedText}**`;
+                    break;
+                case 'italic':
+                    formattedText = `*${selectedText}*`;
+                    break;
+                case 'heading':
+                    formattedText = `# ${selectedText}`;
+                    break;
+                case 'subheading':
+                    formattedText = `## ${selectedText}`;
+                    break;
+                case 'code':
+                    formattedText = `\`\`\`
+${selectedText}
+\`\`\``;
+                    break;
+                case 'list':
+                    formattedText = `* ${selectedText}`;
+                    break;
+                case 'quote':
+                    formattedText = `> ${selectedText}`;
+                    break;
+                default:
+                    formattedText = selectedText;
+            }
+
+            editor.setRangeText(formattedText, editor.selectionStart, editor.selectionEnd, 'end');
+            updatePreview();
+        }
+
+        function showLinkDialog() {
+            document.getElementById('linkDialog').style.display = 'block';
+        }
+
+        function showImageDialog() {
+            document.getElementById('imageDialog').style.display = 'block';
+        }
+
+        function closeDialog(dialogId) {
+            document.getElementById(dialogId).style.display = 'none';
+        }
+
+        function insertLinkFromDialog() {
+            const url = document.getElementById('linkUrl').value;
+            if (url) {
+                const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd) || 'Texto do Link';
+                const formattedText = `[${selectedText}](${url})`;
+                editor.setRangeText(formattedText, editor.selectionStart, editor.selectionEnd, 'end');
+                updatePreview();
+                closeDialog('linkDialog');
+            }
+        }
+
+        function insertImageFromDialog() {
+            const imgUrl = document.getElementById('imageUrl').value;
+            if (imgUrl) {
+                const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd) || 'Texto Alternativo';
+                const formattedText = `![${selectedText}](${imgUrl})`;
+                editor.setRangeText(formattedText, editor.selectionStart, editor.selectionEnd, 'end');
+                updatePreview();
+                closeDialog('imageDialog');
+            }
+        }
+
+        function toggleTheme() {
+            document.body.classList.toggle('dark-theme');
+        }
+
+        function saveMarkdown() {
+            const blob = new Blob([editor.value], { type: 'text/markdown' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'markdown.md';
+            link.click();
+        }
+
+        function loadMarkdown(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    editor.value = reader.result;
+                    updatePreview();
+                };
+                reader.readAsText(file);
+            }
+        }
+    </script>
+</body>
+</html>
