@@ -39,7 +39,7 @@ Para instalar e executar este editor em sua máquina, siga as etapas abaixo:
 * Clone o repositório:
 
 ```
-git clone https://github.com/andersonmoegel/editor-markdown.git
+git clone https://github.com/andersonmoegel/Editor-de-Markdown.git
 cd editor-markdown
 ```
 
